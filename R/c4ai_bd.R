@@ -13,7 +13,7 @@ pg_user<-"postgres"
 pg_passwd<-"123"
 pg_port<-5432
 pg_host<-"localhost"
-pg_dbname<-"c4ai"
+pg_dbname<-"pnae"
 dsn<-paste("PG:dbname =", pg_dbname, "user =", pg_user, "password =",pg_passwd, "port =", pg_port, "host=", pg_host)
 
 drv <- dbDriver("PostgreSQL")

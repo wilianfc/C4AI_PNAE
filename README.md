@@ -1,6 +1,6 @@
 # C4AI_PNAE
 
-No diretório R estão os scripts para conversão dos arquivos json gerados pelo crawler feito pelo Ennio do C4AI para os dados do PNAE.
+No diretório R estão os scripts para conversão dos arquivos json gerados pelo crawler feito pelo Ennio para os dados do PNAE.
 
 O arquivo no c4ai_bd.R estão as configurações para o banco de dados posgreSQL.
 

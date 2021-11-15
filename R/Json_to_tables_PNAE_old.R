@@ -1,15 +1,5 @@
 
-# Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 
-# 
-# set_utf8 <- function(x) {
-#   # Declare UTF-8 encoding on all character columns:
-#   chr <- sapply(x, is.character)
-#   x[, chr] <- lapply(x[, chr, drop = FALSE], `Encoding<-`, "UTF-8")
-#   # Same on column names:
-#   Encoding(names(x)) <- "UTF-8"
-#   x
-# }
 
 install.packages(c('rstudioapi','rjson', 'gtools', 'sqldf', 'iterators', 'digest'))
 
@@ -38,11 +28,10 @@ conc_text <- function(json_field){
 # sink()
 
 #Current
-path<-paste(getwd(),"..", "data","json", sep=.Platform$file.sep)
+path<-paste(getwd(),"..", "data","json/old", sep=.Platform$file.sep)
 list.json.pnae <- mixedsort(list.files(path, full.names=T, pattern=".json"))
 
 for(filepath in list.json.pnae) {
-  #filepath<-list.json.pnae[1] #debug
   message(filepath)
   
 
@@ -59,96 +48,80 @@ for(filepath in list.json.pnae) {
   
   sha256_data_id <- digest(json_data, algo = "sha256")
   
-  # extract_log_fields <- json_data$data$identification$fields
-  # 
-  # # length(json_data$data$identification$fields)
-  # # length(unlist(json_data$data$identification$data))
-  # 
-  # create_extract_log_fields <-
-  #   paste(conc_text(extract_log_fields), collapse = ", ") # cria string  de campos para create sql
-  # 
-  # insert_extract_log_fields <-
-  #   paste('"',
-  #         extract_log_fields,
-  #         '"',
-  #         collapse = ", ",
-  #         sep = "")
-  # 
-  # ##Change NULL to NA (must be done for all data)
-  # json_data$data$identification$data[[1]][sapply(json_data$data$identification$data[[1]][], is.null)]<-NA
-  # 
-  # insert_extract_log_data <-
-  #   paste("'",
-  #         unlist(json_data$data$identification$data),
-  #         "'",
-  #         collapse = ", ",
-  #         sep = "")
-  # 
-  # 
-  # ### creating table
-  # 
-  # message(paste(
-  #   "extractLog: Campos identificados:\n",
-  #   insert_extract_log_fields
-  # ))
-  # 
-  # #cria a tabela docinfo no postgresSQL
-  # sql.query <-
-  #   paste(
-  #     "CREATE TABLE IF NOT EXISTS extractLog (",
-  #     create_extract_log_fields,
-  #     ', "sha256_id" text PRIMARY KEY',
-  #     ");"
-  #   )
-  # #set_utf8(sql.query)
-  # rs <- postgresqlpqExec(con, sql.query)
-  # 
-  # 
-  # ## inserting data
-  # 
-  # message(paste("extractLog: inserindo dados:\n",   insert_extract_log_data))
-  # sql.query <-
-  #   paste(
-  #     'INSERT INTO extractLog (',
-  #     insert_extract_log_fields ,
-  #     ', "sha256_id"',
-  #     ') VALUES (',
-  #     insert_extract_log_data ,
-  #     ',\'',
-  #     sha256_data_id,
-  #     '\'',
-  #     ');',
-  #     sep = ""
-  #   )
-  # rs <- postgresqlpqExec(con, sql.query)
-  # 
+  extract_log_fields <- json_data$extractLog$fields
+  create_extract_log_fields <-
+    paste(conc_text(extract_log_fields), collapse = ", ") # cria string  de campos para create sql
+  insert_extract_log_fields <-
+    paste('"',
+          extract_log_fields,
+          '"',
+          collapse = ", ",
+          sep = "")
+  
+  insert_extract_log_data <-
+    paste("'",
+          unlist(json_data$extractLog$data),
+          "'",
+          collapse = ", ",
+          sep = "")
+  
+  
+  ### creating table
+  
+  message(paste(
+    "extractLog: Campos identificados:\n",
+    insert_extract_log_fields
+  ))
+  
+  #cria a tabela docinfo no postgresSQL
+  sql.query <-
+    paste(
+      "CREATE TABLE IF NOT EXISTS extractLog (",
+      create_extract_log_fields,
+      ', "sha256_id" text PRIMARY KEY',
+      ");"
+    )
+  rs <- postgresqlpqExec(con, sql.query)
+  
+  
+  ## inserting data
+  
+  message(paste("extractLog: inserindo dados:\n",   insert_extract_log_data))
+  sql.query <-
+    paste(
+      'INSERT INTO extractLog (',
+      insert_extract_log_fields ,
+      ', "sha256_id"',
+      ') VALUES (',
+      insert_extract_log_data ,
+      ',\'',
+      sha256_data_id,
+      '\'',
+      ');',
+      sep = ""
+    )
+  rs <- postgresqlpqExec(con, sql.query)
+  
   
   
   #############################################################
   
   ################## Data Identification ######################
-  # Fields table
-  dataidentification_fields <-json_data$data$identification$fields
   
-  
- ##Change NULL to NA (must be done for all data)
- json_data$data$identification$data[[1]][sapply(json_data$data$identification$data[[1]][], is.null)]<-NA
-  
-  # data to insert
+  dataidentification_fields <- json_data$dataIdentification$fields
   dataidentification_data <-
     paste(
       "'",
-      unlist(json_data$data$identification$data),
+      unlist(json_data$dataIdentification$data),
       "'",
       collapse = ", ",
       sep = ""
     )
   
-  # create table statement
+  
+  
   create_dataidentification_fields <-
     paste(conc_text(dataidentification_fields), collapse = ", ")
-  
-  # insert data statement fields
   insert_dataidentification_fields <-
     paste('"',
           dataidentification_fields,
@@ -161,11 +134,8 @@ for(filepath in list.json.pnae) {
     paste(
       "CREATE TABLE IF NOT EXISTS dataIdentification (",
       create_dataidentification_fields,
-      ', "sha256_id" text PRIMARY KEY',
-      ");
-      COMMENT ON COLUMN public.dataidentification.sha256_id
-      IS 'sha256 generated for json file text';
-      "
+      ', "sha256_id" text REFERENCES extractLog(sha256_id)',
+      ");"
     )
   rs <- postgresqlpqExec(con, sql.query)
   
@@ -187,13 +157,13 @@ for(filepath in list.json.pnae) {
   
   
   ##########################################################################
-  #### docInfo ###################
-  ######### verificar se todos os json_data$data$docs[[i]]$docInfo$fields
+  
+  ######### verificar se todos os documentData$data[[i]]$docInfo$fields
   ######## possuem o mesmo numero de campos
   ####  Assume que sÃ£o iguais se sim
   
   
-  tam <- length(json_data$data$docs ) #Quantidade de notas
+  tam <- length(json_data$documentData$data) #Quantidade de notas
   #### verificar se todos tem o mesmo tamanho
   text_fields_new <- NULL
   text_fields_create <- ""  #variÃ¡vel utilizada para criar campos
@@ -202,9 +172,9 @@ for(filepath in list.json.pnae) {
     # se sim, criar tabela no postgres usando como base o primeiro registro
     
     len <-
-      length(json_data$data$docs[[i]]$docInfo$data) #tamanho obtido pelo s dados devido a campos faltantes nos fields
+      length(json_data$documentData$data[[i]]$docInfo$data) #tamanho obtido pelo s dados devido a campos faltantes nos fields
     for (f in 1:len) {
-      field <- json_data$data$docs[[i]]$docInfo$fields[f]
+      field <- json_data$documentData$data[[i]]$docInfo$fields[f]
       if (is.na(field))
         field <- paste("field_", f, sep = "")
       if (is.null(text_fields_new)) {
@@ -237,7 +207,7 @@ for(filepath in list.json.pnae) {
       "CREATE TABLE IF NOT EXISTS docInfo (",
       text_fields_create,
       ',
-      "sha256_id" text, nf_c4ai_id text PRIMARY KEY',
+      "sha256_id" text REFERENCES extractLog(sha256_id), nf_c4ai_id text PRIMARY KEY',
       ");"
     )
   rs <- postgresqlpqExec(con, sql.query)
@@ -268,13 +238,13 @@ for(filepath in list.json.pnae) {
   
   ########################
   
-  tam <- length(json_data$data$docs )
+  
   
   for (i in 1:tam) {
     text_fields <-
       paste(
         '"',
-        json_data$data$docs[[i]]$docInfo$fields,
+        json_data$documentData$data[[i]]$docInfo$fields,
         '"',
         collapse = ", ",
         sep = ""
@@ -284,20 +254,10 @@ for(filepath in list.json.pnae) {
     
     #get string field list
     text_data <- NULL
-    len <- length(json_data$data$docs[[i]]$docInfo$data)
-    
+    len <- length(json_data$documentData$data[[i]]$docInfo$data)
     #if (len == 14) {
-    text_to_hash <- NULL
     for (d in 1:len) {
-      data <- json_data$data$docs[[i]]$docInfo$data[d]
-      
-      if(d>2) {  #desconsiderar os dois primeiros campos, pois não são do documento
-        if(is.null(text_to_hash)) text_to_hash <-data
-        else
-          text_to_hash <-paste(text_to_hash,data)
-      }
-      
-      
+      data <- json_data$documentData$data[[i]]$docInfo$data[d]
       if (data == "")
         data = " "
       if (is.null(text_data)) {
@@ -310,7 +270,7 @@ for(filepath in list.json.pnae) {
         text_data <- paste(text_data, "'", data, "'", sep = "")
       }
     }
-    nf_c4ai_id <- digest(text_to_hash, algo = "sha256")
+    nf_c4ai_id <- digest(text_data, algo = "sha256")
     #INSERT INTO table_name (column1, column2, column3, ...)
     #VALUES (value1, value2, value3, ...);
     
@@ -383,7 +343,6 @@ for(filepath in list.json.pnae) {
     ) 
 
     if(out==1) next
-  #}
   
     
     # } else{
@@ -410,42 +369,20 @@ for(filepath in list.json.pnae) {
     # Obter campos
     
     
-  #   #text_fields <- NULL
-  # tam <- length(json_data$data$docs ) #Quantidade de notas
-  # for (i in 1:tam) {
-  #     #chave_nf <- json_data$documentData$data[[i]]$docInfo$data[4]
-  #     
-  #     text_data <- NULL
-  #     len <- length(json_data$data$docs[[i]]$docInfo$data)
-  #     
-  #     #if (len == 14) {
-  #     text_to_hash <- NULL
-  #     for (d in 1:len) {
-  #       data <- json_data$data$docs[[i]]$docInfo$data[d]
-  #       
-  #       if(d>2) {  #desconsiderar os dois primeiros campos, pois não são do documento
-  #         if(is.null(text_to_hash)) text_to_hash <-data
-  #         else
-  #           text_to_hash <-paste(text_to_hash,data)
-  #       }
-  #       
-  #     }
-  #     nf_c4ai_id <- digest(text_to_hash, algo = "sha256")
+    #text_fields <- NULL
+    
+   # for (i in 1:tam) {
+      #chave_nf <- json_data$documentData$data[[i]]$docInfo$data[4]
       
-      
-      
-      
-      
-  
       len_fields <-
-        length(json_data$data$docs[[i]]$docItems$fields)
+        length(json_data$documentData$data[[i]]$docItems$fields)
       len_itens <-
-        length(json_data$data$docs[[i]]$docItems$data)
+        length(json_data$documentData$data[[i]]$docItems$data)
       
       #get create table field list
       text_fields_create <- NULL
       for (f in 1:len_fields) {
-        field <- json_data$data$docs[[i]]$docItems$fields[f]
+        field <- json_data$documentData$data[[i]]$docItems$fields[f]
         if (is.na(field))
           field <- paste("field_", f, sep = "")
         if (is.null(text_fields_create)) {
@@ -476,7 +413,7 @@ for(filepath in list.json.pnae) {
       #get string field list insert
       text_fields_itens <- NULL
       for (f in 1:len_fields) {
-        field <- json_data$data$docs[[i]]$docItems$fields[f]
+        field <- json_data$documentData$data[[i]]$docItems$fields[f]
         if (is.na(field))
           field <- paste("field_", f, sep = "")
         if (is.null(text_fields_itens)) {
@@ -503,7 +440,7 @@ for(filepath in list.json.pnae) {
       for (it in 1:len_itens) {
         text_data <- NULL
         for (f in 1:len_fields) {
-          data <- json_data$data$docs[[i]]$docItems$data[[it]][f]
+          data <- json_data$documentData$data[[i]]$docItems$data[[it]][f]
           
           if (data == "")
             data = " "
@@ -538,8 +475,6 @@ for(filepath in list.json.pnae) {
                 text_fields_create,
                 ");",
                 sep = '')
-        
-        
         rs <- postgresqlpqExec(con, sql.query)
         
         sql.query <-
@@ -582,8 +517,7 @@ path<-paste(getwd(),"..", "data","csv",'', sep=.Platform$file.sep)
 for(nome_tab in nomes_tabelas$tablename ){
   
   tabela<-postgresqlReadTable(con, nome_tab )
-  #set_utf8(tabela)
-  write.csv2(tabela, file=paste(path, nome_tab,'_utf8.csv', sep="" ), fileEncoding = "UTF-8")
+  write.csv2(tabela, file=paste(path, nome_tab,'_utf8.csv', sep="" ))
   
 }
 
